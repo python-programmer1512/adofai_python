@@ -131,7 +131,7 @@ class tile(pygame.sprite.Sprite):
         self.t_d=deque([])  # [degree,opt]
         #opt = 0 : x , opt = 1 : change, opt = 2 : fast, opt = 3 : slow
         self.t_s=deque([])  # 타일의 왼쪽 벽의 중심 좌표(A), 타일 자체의 중심 좌표(B), 타일의 오른쪽 벽의 중심 좌표(C)
-        self.start=[0,(size[0]/2,size[1]/2)] # [degree(초기 각도),pos(x,y)], 중심에서 타일의 길이만큼 이동: self.ts/2
+        self.start=[0,(size[0]/2,size[1]/2-self.ts/2)] # [degree(초기 각도),pos(x,y)], 중심에서 타일의 길이만큼 이동: self.ts/2
         self.build()
 
     def build(self,degree=-1,opt=0): #상대 각도
@@ -141,15 +141,17 @@ class tile(pygame.sprite.Sprite):
         if degree==-1:
             ldg=self.start[0]
             lpos=self.start[1]
-            degree=180
+            degree=self.start[0]
         else:
             ldg=self.t_d[len(self.t_d)-1][0]
-            lpos=self.t_s[len(self.t_s)-1][1]
-        B=lpos # last pos
-        A=(B[0]+self.ts/2*cos(radians(angle_change(ldg))),B[1]+self.ts/2*sin(radians(angle_change(ldg)))) # 타일의 끝부분
+            lpos=self.t_s[len(self.t_s)-1][2]
+        A=lpos # last pos
+        #print("##",ldg)
+        B=(A[0]+self.ts/2*cos(radians(angle_change(ldg))),A[1]-self.ts/2*sin(radians(angle_change(ldg)))) # 타일의 끝부분
         Dg=ldg+degree
         Dg%=360
-        C=(B[0]+self.ts/2*sin(radians(angle_change(Dg))),B[1]+self.ts/2*cos(radians(angle_change(Dg)))) # 타일의 끝부분
+        #print("#@$",Dg)
+        C=(B[0]+self.ts/2*cos(radians(angle_change(Dg))),B[1]-self.ts/2*sin(radians(angle_change(Dg)))) # 타일의 끝부분
         self.t_d.append([Dg,opt])
         self.t_s.append([A,B,C])
 
@@ -168,8 +170,8 @@ class tile(pygame.sprite.Sprite):
             pygame.draw.polygon(SURFACE, color[colorn[i]], Q,6)
             pygame.draw.polygon(SURFACE, color[colorn[i]], QQ,6)
             pygame.draw.circle(SURFACE,color["black"],B,self.bs+5)
-            #pygame.draw.polygon(SURFACE, color["black"], Q)
-            #pygame.draw.polygon(SURFACE, color["black"], QQ)
+            pygame.draw.polygon(SURFACE, color["black"], Q)
+            pygame.draw.polygon(SURFACE, color["black"], QQ)
             if self.t_d[i][1]!=0:
                 ir=self.img[self.t_d[i][1]-1].get_rect()
                 ir.center=B
@@ -205,13 +207,15 @@ def start():
     #Te.build(120)
     #Te.build(300)
     #Te.build(180)
-    Te.build(180)
+    Te.build(90)
     for i in range(20):
-        Te.build(180,1)#randint(1,3))
-        Te.build(36,1)#randint(1,3))#randint(1,360))
-    Te.build(180)
-    Te.build(180)
-    print(Te.t_d)
+        Te.build(0,1)#randint(1,3))
+        Te.build(45,1)#randint(1,3))#randint(1,360))
+    Te.build(0)
+    Te.build(0)
+    Rn=B.rn
+    B.x[(Rn+1)%2]=Te.t_s[0][1][0]
+    B.y[(Rn+1)%2]=Te.t_s[0][1][1]
     ###s
     #print(Te.t_d)
 
