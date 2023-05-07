@@ -8,6 +8,7 @@ from pygame.locals import QUIT,KEYDOWN,K_LEFT,K_RIGHT,K_UP,K_DOWN,Rect,MOUSEBUTT
 pygame.init()
 FPSCLOCK = pygame.time.Clock()
 size=(1200,830)
+FPS=60
 SURFACE = pygame.display.set_mode(size)
 color={
     "black":[0,0,0],
@@ -30,10 +31,158 @@ def angle_change(angle):
     # -90 : 180, -180 : 270, -91 : 181
     return (-(angle-90))%360
 
-class ball(pygame.sprite.Sprite):
+
+class CameraGroup(pygame.sprite.Group):
     def __init__(self):
-        pygame.sprite.Sprite.__init__(self)
+        super().__init__()
+        self.display_surface = pygame.display.get_surface()
+
+        # camera offset 
+        self.offset = pygame.math.Vector2()
+        self.half_w = self.display_surface.get_size()[0] // 2
+        self.half_h = self.display_surface.get_size()[1] // 2
+        #print(self.half_w,self.half_h)
+
+        # camera speed
+        self.keyboard_speed = 5
+        self.mouse_speed = 0.2
+
+        # zoom 
+        self.zoom_scale = 1
+        self.internal_surf_size = (2500,2500)
+        self.internal_surf = pygame.Surface(self.internal_surf_size, pygame.SRCALPHA)
+        self.internal_rect = self.internal_surf.get_rect(center = (self.half_w,self.half_h))
+        self.internal_surface_size_vector = pygame.math.Vector2(self.internal_surf_size)
+        self.internal_offset = pygame.math.Vector2()
+        self.internal_offset.x = self.internal_surf_size[0] // 2 - self.half_w
+        self.internal_offset.y = self.internal_surf_size[1] // 2 - self.half_h
+
+    
+    def center_target_camera(self,target):
+
+        Rn=target.rn
+        a=1
+        X_distance=target.rect[(Rn+1)%2].centerx - self.half_w
+        Y_distance=target.rect[(Rn+1)%2].centery - self.half_h
+        """
+        # (X_distance/abs(X_distance)) : 값에 따라 + 또는 - 가 나오게 하는 코드
+        if X_distance!=0:
+            self.offset.x = (X_distance/abs(X_distance)) * sqrt(a*abs(X_distance))
+        else:
+            self.offset.x=0
+        
+        if Y_distance!=0:
+            self.offset.y = (Y_distance/abs(Y_distance)) * sqrt(a*abs(Y_distance))
+        else:
+            self.offset.y=0
+
+        """
+
+        self.offset.x = X_distance
+        self.offset.y = Y_distance
+
+
+    def zoom_keyboard_control(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_q]:
+            self.zoom_scale += 0.1
+
+        if keys[pygame.K_e]:
+            if self.zoom_scale-0.1 > 0:
+                self.zoom_scale -= 0.1
+        
+
+    def custom_draw(self,player):
+
+        self.center_target_camera(player)
+        # self.box_target_camera(player)
+        # self.keyboard_control()
+        #self.zoom_keyboard_control()
+
+        self.internal_surf.fill(color["gray"])
+        #print("XCV)")
+
+        #sprite 로 묶여있는 것들의 class 정보 다 가지고 올 수 있음
+        #(self.sprites())
+
+        A=self.sprites()[0] #group 된 spirte 의 첫번째 
+        B=self.sprites()[1] #group 된 spirte 의 두번째 
+
+        ball_tile={"ball":0,"tile":0}# 코드를 간단화 시키기 위한 dict
+
+
+        if A.CLASS_NAME=="ball":
+            ball_tile["ball"]=A
+            ball_tile["tile"]=B
+        elif A.CLASS_NAME=="tile":
+            ball_tile["ball"]=B
+            ball_tile["tile"]=A
+            #SURFACE.blit(self.img[0],self.rect[0])
+            #SURFACE.blit(self.img[1],self.rect[1])
+
+
+        STACK=ball_tile["tile"].draw()
+        for i in range(len(STACK)):
+
+            ball_offset_pos = STACK[i][1].center - self.offset + self.internal_offset
+            ball_offset_pos_rect=STACK[i][0].get_rect()
+            ball_offset_pos_rect.center=ball_offset_pos
+            self.internal_surf.blit(STACK[i][0],ball_offset_pos_rect)
+            #print(f"{i} number tile's pos : {ball_offset_pos_rect}")
+
+        ball_tile["ball"].rotation()
+        #ball_tile["ball"].afterimage(0)
+        ball_tile["ball"].draw()
+        red_offset_pos = ball_tile["ball"].rect[0].center - self.offset + self.internal_offset
+        red_offset_pos_rect=ball_tile["ball"].img[0].get_rect()
+        red_offset_pos_rect.center=red_offset_pos
+        self.internal_surf.blit(ball_tile["ball"].img[0],red_offset_pos_rect)
+
+        blue_offset_pos = ball_tile["ball"].rect[1].center - self.offset + self.internal_offset
+        blue_offset_pos_rect=ball_tile["ball"].img[1].get_rect()
+        blue_offset_pos_rect.center=blue_offset_pos
+        self.internal_surf.blit(ball_tile["ball"].img[1],blue_offset_pos_rect)
+
+        #print(f"blue ball's pos : {blue_offset_pos}")
+        #print(f"red ball's pos : {red_offset_pos}")
+
+        scaled_surf = pygame.transform.scale(self.internal_surf,self.internal_surface_size_vector * self.zoom_scale)
+        scaled_rect = scaled_surf.get_rect(center = (self.half_w,self.half_h))
+
+        self.display_surface.blit(scaled_surf,scaled_rect)
+
+
+        #print(self.sprites()[0].rect[0].centery)
+
+
+        """
+        Te.draw()
+        B.rotation()
+        B.afterimage(0)
+        B.draw()
+        
+
+        # active elements
+        for sprite in sorted(self.sprites(),key = lambda sprite: sprite.rect[0].centery):
+            print("##",sprite)
+            offset_pos = sprite.rect.topleft - self.offset + self.internal_offset
+            self.internal_surf.blit(sprite.image,offset_pos)
+
+        scaled_surf = pygame.transform.scale(self.internal_surf,self.internal_surface_size_vector * self.zoom_scale)
+        scaled_rect = scaled_surf.get_rect(center = (self.half_w,self.half_h))
+
+        self.display_surface.blit(scaled_surf,scaled_rect)
+
+        """
+
+
+    
+class ball(pygame.sprite.Sprite):
+    def __init__(self,group):
+        #pygame.sprite.Sprite.__init__(group)
+        super().__init__(group)
         self.rimg=[pygame.image.load("ball/red.png").convert_alpha(),pygame.image.load("ball/blue.png").convert_alpha()]
+        self.CLASS_NAME="ball"
         self.size=27 # ball size, 반지름
         self.img=[0,0]
         self.img[0]=pygame.transform.scale(self.rimg[0],(self.size*2,self.size*2))
@@ -47,8 +196,10 @@ class ball(pygame.sprite.Sprite):
         self.rc=[color["red"],color["blue"]] #rotation color
         self.dn=1 #direction, 1 : right, -1 : left
         self.rect=[self.img[0].get_rect(),self.img[1].get_rect()]
+        self.rect[0].center=(self.x[0],self.y[0])
+        self.rect[1].center=(self.x[1],self.y[1])
         self.startangle=self.angle
-        self.bv=0.5 #0. # angle/tick 단위 시간당 회전 각, ball velocity
+        self.bv=0.05*FPS #0. # angle/tick 단위 시간당 회전 각, ball velocity
 
 
 
@@ -66,9 +217,8 @@ class ball(pygame.sprite.Sprite):
         self.rect[0].center=(self.x[0],self.y[0])
         self.rect[1].center=(self.x[1],self.y[1])
 
-
-        SURFACE.blit(self.img[0],self.rect[0])
-        SURFACE.blit(self.img[1],self.rect[1])
+        #SURFACE.blit(self.img[0],self.rect[0])
+        #SURFACE.blit(self.img[1],self.rect[1])
 
     def afterimage(self,cnt): # 공의 잔상
         Rn=self.rn
@@ -116,22 +266,42 @@ class ball(pygame.sprite.Sprite):
         self.startangle=self.angle
 
 class tile(pygame.sprite.Sprite):
-    def __init__(self,bs,ts):
-        pygame.sprite.Sprite.__init__(self)
+    def __init__(self,bs,ts,group):
+        super().__init__(group)
+        #pygame.sprite.Sprite.__init__(self)
+        #super().__init__(group)
         # bs = ball size, ts = tile size
+
+        self.CLASS_NAME="tile"
+
+        self.size=bs
+        self.nt=1
+        self.bs=bs
+        self.ts=ts
+
+        self.Tile_img=pygame.image.load("tile/tile.png").convert_alpha()
+        self.Tile_img=pygame.transform.scale(self.Tile_img,(self.size*2+8,self.ts/2)) # 시작 이미지의 각도를 0도로하기 위해 위로 키움
+        self.mask=pygame.mask.from_surface(self.Tile_img)
+        self.x=size[0]//2
+        self.y=size[1]//2
+
+        #self.rect=self.Tile_img.get_rect()
+        #self.rect.center=(self.x,self.y)
+
+        #self.rect=self.Tile_img.get_rect()
+        #self.rect.center(self.x,self.y)
+
+
         self.rimg=[pygame.image.load("tile/change.png").convert_alpha()]
         self.size=27
         self.img=[0,0,0]
         self.img[0]=pygame.transform.scale(self.rimg[0],(self.size*2,self.size*2))
         self.mask=[pygame.mask.from_surface(self.img[0])]
 
-        self.nt=1
-        self.bs=bs
-        self.ts=ts
         self.t_d=deque([])  # [degree,opt]
         #opt = 0 : x , opt = 1 : change, opt = 2 : fast, opt = 3 : slow
         self.t_s=deque([])  # 타일의 왼쪽 벽의 중심 좌표(A), 타일 자체의 중심 좌표(B), 타일의 오른쪽 벽의 중심 좌표(C)
-        self.start=[0,(size[0]/2,size[1]/2-self.ts/2)] # [degree(초기 각도),pos(x,y)], 중심에서 타일의 길이만큼 이동: self.ts/2
+        self.start=[0,(size[0]/2,size[1]/2)] # [degree(초기 각도),pos(x,y)]
         self.build()
 
     def build(self,degree=-1,opt=0): #상대 각도
@@ -152,30 +322,70 @@ class tile(pygame.sprite.Sprite):
         Dg%=360
         #print("#@$",Dg)
         C=(B[0]+self.ts/2*cos(radians(angle_change(Dg))),B[1]-self.ts/2*sin(radians(angle_change(Dg)))) # 타일의 끝부분
-        self.t_d.append([Dg,opt])
+        self.t_d.append([Dg,0,ldg])#opt
         self.t_s.append([A,B,C])
 
     def draw(self):
+
+        """
+        self.x[Rn]=self.x[(Rn+1)%2]+self.r*sin(radians(self.angle))
+        self.y[Rn]=self.y[(Rn+1)%2]+self.r*cos(radians(self.angle))
+        #print("##",self.x[(Rn+1)%2],self.y[(Rn+1)%2])
+        #print("##",self.x[Rn],self.y[Rn])
+
+        self.rect[0].center=(self.x[0],self.y[0])
+        self.rect[1].center=(self.x[1],self.y[1])
+
+        SURFACE.blit(self.img[0],self.rect[0])
+        SURFACE.blit(self.img[1],self.rect[1])
+
+        """
+        #rotation_ship_image=pygame.transform.rotate(A["img"],-A["angle"])
+
+        print_stack=[]
         n=min(5,len(self.t_s))
         for ui in range(n):
             i=n-ui-1
             A=self.t_s[i][0]
             B=self.t_s[i][1]
             C=self.t_s[i][2]
-            #pygame.draw.line(SURFACE,color[colorn[i]],A,B,3)
-            #pygame.draw.line(SURFACE,color[colorn[i]],B,C,3)
-            pygame.draw.circle(SURFACE,color[colorn[i]],B,self.bs+8,6)
-            Q=f(A,B,self.bs+5)#32 = bs+5
-            QQ=f(B,C,self.bs+5)
-            pygame.draw.polygon(SURFACE, color[colorn[i]], Q,6)
-            pygame.draw.polygon(SURFACE, color[colorn[i]], QQ,6)
-            pygame.draw.circle(SURFACE,color["black"],B,self.bs+5)
-            pygame.draw.polygon(SURFACE, color["black"], Q)
-            pygame.draw.polygon(SURFACE, color["black"], QQ)
+
+            first_tile=pygame.transform.rotate(self.Tile_img,-self.t_d[i][2])  # 회전방향이 반시계라 - 붙여줘야함
+            second_tile=pygame.transform.rotate(self.Tile_img,-self.t_d[i][0]) # 회전방향이 반시계라 - 붙여줘야함
+
+            first_rect=first_tile.get_rect()
+            second_rect=second_tile.get_rect()
+
+            first_x=(A[0]+B[0])/2
+            first_y=(A[1]+B[1])/2
+            second_x=(B[0]+C[0])/2
+            second_y=(B[1]+C[1])/2
+
+            first_rect.center=(first_x,first_y)
+            second_rect.center=(second_x,second_y)
+
+            print_stack.append([first_tile,first_rect])
+            print_stack.append([second_tile,second_rect])
+
+            #SURFACE.blit(first_tile,first_rect)
+            #SURFACE.blit(second_tile,second_rect)
+
+            #Q=f(A,B,self.bs)#32 = bs+5
+            #QQ=f(B,C,self.bs)
+            #pygame.draw.circle(SURFACE,color["yellow"],B,self.bs)
+            #pygame.draw.polygon(SURFACE, color["yellow"], Q)
+            #pygame.draw.polygon(SURFACE, color["yellow"], QQ)
+
+
+        
+
             if self.t_d[i][1]!=0:
                 ir=self.img[self.t_d[i][1]-1].get_rect()
                 ir.center=B
-                SURFACE.blit(self.img[self.t_d[i][1]-1],ir)
+                print_stack.append([self.img[self.t_d[i][1]-1],ir])
+                #SURFACE.blit(self.img[self.t_d[i][1]-1],ir)
+
+        return print_stack
 
 
 def f(A,B,r=5):# 두 점을 중선으로 두는 직사각형 만들기
@@ -199,15 +409,19 @@ def f(A,B,r=5):# 두 점을 중선으로 두는 직사각형 만들기
     #a*b=-1, b=-1/a // y=bx+c, A[1]=b*A[0]+c, A[1]-b*A[0]=c
 
 def start():
-    B=ball()
+
+    camera_group=CameraGroup()
+
+    B=ball(camera_group)
     B.r=100
     B.dn*=-1
-
-    Te=tile(B.size,B.r)
+    #print("###",B.r)
+    Te=tile(B.size,B.r,camera_group)
     #Te.build(120)
     #Te.build(300)
     #Te.build(180)
     Te.build(90)
+    
     for i in range(20):
         Te.build(0,1)#randint(1,3))
         Te.build(45,1)#randint(1,3))#randint(1,360))
@@ -216,8 +430,9 @@ def start():
     Rn=B.rn
     B.x[(Rn+1)%2]=Te.t_s[0][1][0]
     B.y[(Rn+1)%2]=Te.t_s[0][1][1]
+    
     ###s
-    #print(Te.t_d)
+    #print(Te.t_s)
 
 
     while 1:
@@ -242,18 +457,24 @@ def start():
                     Te.t_d.popleft()
                 else:
                     print("miss")
-                    return
+                    #return
                 #B.change()
                 #B.dn*=-1
                 break
                 
 
+            
+        """
         Te.draw()
 
         B.rotation()
-        B.afterimage(10)
+        B.afterimage(0)
         B.draw()
-        #FPSCLOCK.tick(50)
+        """
+        
+        #camera_group.update()
+        camera_group.custom_draw(B)
+        FPSCLOCK.tick(FPS)
 
         pygame.display.update()
 
